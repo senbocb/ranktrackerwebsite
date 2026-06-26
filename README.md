@@ -2,7 +2,7 @@
 
 A competitive gaming rank tracker displaying rankings across multiple platforms and game types.
 
-**Live at:** https://senbosranks.github.io/
+**Live at:** https://senbocb.github.io/ranktrackerwebsite/
 
 ## Features
 - 🎮 Track ranks across 50+ games
