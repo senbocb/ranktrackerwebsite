@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rank Tracker</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #06060c;
+      --card: #0c0c16;
+      --border: #16162a;
+      --glow: rgba(99, 102, 241, 0.15);
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: #e0e0e0;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    canvas#bg-canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .page-content { position: relative; z-index: 1; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 20px var(--glow), inset 0 1px 0 rgba(255,255,255,0.05); }
+      50% { box-shadow: 0 0 40px var(--glow), inset 0 1px 0 rgba(255,255,255,0.08); }
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -200% center; }
+      100% { background-position: 200% center; }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    @keyframes gradient-shift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    @keyframes borderGlow {
+      0%, 100% { border-color: rgba(99,102,241,0.2); }
+      50% { border-color: rgba(99,102,241,0.5); }
+    }
+
+    @keyframes countUp {
+      from { opacity: 0; transform: scale(0.5); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes rankPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
+    .hero {
+      text-align: center;
+      padding: 80px 20px 50px;
+      background: linear-gradient(180deg, #0e0e1a 0%, var(--bg) 100%);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+      animation: fadeIn 0.8s ease;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero h1 {
+      font-size: 3.5rem;
+      font-weight: 900;
+      background: linear-gradient(135deg, #818cf8, #a855f7, #ec4899, #818cf8);
+      background-size: 300% 300%;
+      animation: gradient-shift 6s ease infinite;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 12px;
+      letter-spacing: -1px;
+    }
+
+    .hero p {
+      color: #555;
+      font-size: 1rem;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      animation: fadeUp 0.8s ease 0.2s both;
+    }
+
+    .stats-bar {
+      display: flex;
+      gap: 0;
+      justify-content: center;
+      padding: 0;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      animation: slideDown 0.6s ease 0.3s both;
+    }
+
+    .stat {
+      text-align: center;
+      padding: 20px 40px;
+      border-right: 1px solid var(--border);
+      transition: background 0.3s;
+    }
+
+    .stat:last-child { border-right: none; }
+    .stat:hover { background: rgba(99,102,241,0.05); }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 900;
+      font-family: 'JetBrains Mono', monospace;
+      background: linear-gradient(135deg, #818cf8, #a855f7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: countUp 0.6s ease both;
+    }
+
+    .stat:nth-child(1) .stat-value { animation-delay: 0.5s; }
+    .stat:nth-child(2) .stat-value { animation-delay: 0.6s; }
+    .stat:nth-child(3) .stat-value { animation-delay: 0.7s; }
+
+    .stat-label {
+      font-size: 0.65rem;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-top: 4px;
+      font-weight: 600;
+    }
+
+    .filters {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      flex-wrap: wrap;
+      padding: 16px 20px;
+      position: sticky;
+      top: 0;
+      background: rgba(6,6,12,0.85);
+      backdrop-filter: blur(20px);
+      z-index: 10;
+      border-bottom: 1px solid var(--border);
+      animation: fadeIn 0.6s ease 0.4s both;
+    }
+
+    .filter-btn {
+      padding: 8px 18px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: #666;
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .filter-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .filter-btn:hover {
+      border-color: #6366f1;
+      color: #e0e0e0;
+      transform: translateY(-1px);
+    }
+
+    .filter-btn.active {
+      border-color: transparent;
+      color: #fff;
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      box-shadow: 0 4px 20px rgba(99,102,241,0.3);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 30px 20px;
+    }
+
+    .category-section {
+      margin-bottom: 40px;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    .category-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .category-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      font-weight: 700;
+      transition: transform 0.3s;
+    }
+
+    .category-icon:hover { transform: rotate(10deg) scale(1.1); }
+
+    .category-header h2 {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: #e0e0e0;
+      letter-spacing: -0.3px;
+    }
+
+    .category-count {
+      margin-left: auto;
+      font-size: 0.7rem;
+      color: #444;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+      gap: 14px;
+    }
+
+    .game-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .game-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #6366f1, #a855f7, transparent);
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+
+    .game-card:hover {
+      border-color: rgba(99,102,241,0.3);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4), 0 0 30px rgba(99,102,241,0.08);
+    }
+
+    .game-card:hover::before { opacity: 1; }
+
+    .game-card.has-rank {
+      border-left: 3px solid #6366f1;
+    }
+
+    .game-card.has-rank:hover {
+      animation: borderGlow 2s ease infinite;
+    }
+
+    .game-card.no-data {
+      opacity: 0.35;
+    }
+
+    .game-card.no-data:hover {
+      opacity: 0.6;
+    }
+
+    .game-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 14px;
+    }
+
+    .game-title {
+      font-weight: 800;
+      font-size: 1.05rem;
+      color: #f0f0f0;
+      letter-spacing: -0.3px;
+    }
+
+    .game-subtitle {
+      font-size: 0.7rem;
+      color: #555;
+      margin-top: 3px;
+      font-weight: 500;
+    }
+
+    .rank-badge {
+      font-size: 0.72rem;
+      padding: 5px 12px;
+      border-radius: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+      font-family: 'JetBrains Mono', monospace;
+      transition: transform 0.3s;
+    }
+
+    .rank-badge:hover { animation: rankPulse 0.4s ease; }
+
+    .rank-badge.diamond { background: rgba(96,165,250,0.15); color: #60a5fa; border: 1px solid rgba(96,165,250,0.2); }
+    .rank-badge.master { background: rgba(168,85,247,0.15); color: #a855f7; border: 1px solid rgba(168,85,247,0.2); }
+    .rank-badge.platinum { background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.2); }
+    .rank-badge.gold { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+    .rank-badge.silver { background: rgba(148,163,184,0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.2); }
+    .rank-badge.global { background: rgba(52,211,153,0.15); color: #34d399; border: 1px solid rgba(52,211,153,0.2); }
+    .rank-badge.level { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.2); }
+    .rank-badge.premier { background: rgba(249,115,22,0.15); color: #f97316; border: 1px solid rgba(249,115,22,0.2); }
+
+    .mode-section {
+      background: rgba(255,255,255,0.015);
+      border: 1px solid rgba(255,255,255,0.03);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      transition: all 0.3s;
+    }
+
+    .mode-section:last-child { margin-bottom: 0; }
+
+    .mode-section:hover {
+      background: rgba(255,255,255,0.03);
+      border-color: rgba(255,255,255,0.06);
+    }
+
+    .mode-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .mode-name {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #a0a0b0;
+    }
+
+    .mode-season {
+      font-size: 0.6rem;
+      color: #444;
+      font-weight: 600;
+      background: rgba(255,255,255,0.03);
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .mode-ranks {
+      display: flex;
+      gap: 12px;
+    }
+
+    .mode-rank {
+      flex: 1;
+    }
+
+    .mode-rank-label {
+      font-size: 0.58rem;
+      color: #444;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 2px;
+      font-weight: 700;
+    }
+
+    .mode-rank-value {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #d0d0d0;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .mode-rank-value.empty {
+      color: #333;
+      font-style: italic;
+      font-weight: 400;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .game-links {
+      display: flex;
+      gap: 6px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    .game-link {
+      font-size: 0.65rem;
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: rgba(99,102,241,0.1);
+      color: #818cf8;
+      text-decoration: none;
+      transition: all 0.3s;
+      font-weight: 600;
+      border: 1px solid rgba(99,102,241,0.15);
+    }
+
+    .game-link:hover {
+      background: rgba(99,102,241,0.2);
+      color: #a5b4fc;
+      transform: translateY(-1px);
+    }
+
+    .game-note {
+      margin-top: 10px;
+      font-size: 0.68rem;
+      color: #555;
+      font-style: italic;
+      padding-left: 10px;
+      border-left: 2px solid #222;
+    }
+
+    footer {
+      text-align: center;
+      padding: 50px 20px;
+      color: #222;
+      font-size: 0.7rem;
+      border-top: 1px solid var(--border);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    @media (max-width: 600px) {
+      .hero h1 { font-size: 2.2rem; }
+      .games-grid { grid-template-columns: 1fr; }
+      .stats-bar { flex-direction: column; }
+      .stat { border-right: none; border-bottom: 1px solid var(--border); padding: 16px; }
+      .stat:last-child { border-bottom: none; }
+      .mode-ranks { flex-direction: column; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div class="page-content">
+
+  <div class="hero">
+    <h1>Rank Tracker</h1>
+    <p>Competitive gaming ranks across all platforms</p>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat">
+      <div class="stat-value" id="totalGames">0</div>
+      <div class="stat-label">Total Games</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="trackedGames">0</div>
+      <div class="stat-label">Tracked</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="peakRanks">0</div>
+      <div class="stat-label">Peak Ranks</div>
+    </div>
+  </div>
+
+  <div class="filters" id="filters"></div>
+
+  <div class="container" id="container"></div>
+
+  <footer>Last updated: June 2026</footer>
+
+</div>
+
+<script>
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let particles = [];
+let w, h;
+
+function resize() {
+  w = canvas.width = window.innerWidth;
+  h = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+class Particle {
+  constructor() {
+    this.reset();
+  }
+  reset() {
+    this.x = Math.random() * w;
+    this.y = Math.random() * h;
+    this.size = Math.random() * 1.5 + 0.5;
+    this.speedX = (Math.random() - 0.5) * 0.3;
+    this.speedY = (Math.random() - 0.5) * 0.3;
+    this.opacity = Math.random() * 0.4 + 0.1;
+  }
+  update() {
+    this.x += this.speedX;
+    this.y += this.speedY;
+    if (this.x < 0 || this.x > w || this.y < 0 || this.y > h) this.reset();
+  }
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(99, 102, 241, ${this.opacity})`;
+    ctx.fill();
+  }
+}
+
+for (let i = 0; i < 60; i++) particles.push(new Particle());
+
+function connectParticles() {
+  for (let i = 0; i < particles.length; i++) {
+    for (let j = i + 1; j < particles.length; j++) {
+      const dx = particles[i].x - particles[j].x;
+      const dy = particles[i].y - particles[j].y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 120) {
+        ctx.beginPath();
+        ctx.moveTo(particles[i].x, particles[i].y);
+        ctx.lineTo(particles[j].x, particles[j].y);
+        ctx.strokeStyle = `rgba(99, 102, 241, ${0.06 * (1 - dist / 120)})`;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+      }
+    }
+  }
+}
+
+function animateParticles() {
+  ctx.clearRect(0, 0, w, h);
+  particles.forEach(p => { p.update(); p.draw(); });
+  connectParticles();
+  requestAnimationFrame(animateParticles);
+}
+animateParticles();
+
+const games = [
+  { cat: "FPS", sub: "Counter-Strike", name: "Counter-Strike 2", modes: [
+    { mode: "Premier", season: "4", peak: "19,158", current: "19,158" },
+    { mode: "Faceit", peak: "Level 4 (909 elo)", current: "Level 4 (909 elo)" },
+  ], links: ["faceit.com"], note: "" },
+  { cat: "FPS", sub: "Counter-Strike", name: "CS:GO", modes: [
+    { mode: "Competitive", peak: "Gold Nova 3", current: "Unknown / Expired" },
+  ], links: [], note: "Ranked expired" },
+
+  { cat: "FPS", sub: "Overwatch", name: "Overwatch 1", modes: [
+    { mode: "Tank", peak: "Plat (2500-2999)", current: "N/A" },
+    { mode: "Damage", peak: "Plat (2500-2999)", current: "N/A" },
+    { mode: "Support", peak: "Plat (2500-2999)", current: "N/A" },
+  ], links: [], note: "Roles retired" },
+  { cat: "FPS", sub: "Overwatch", name: "Overwatch 2", modes: [
+    { mode: "Tank", peak: "Diamond 3/2", current: "" },
+    { mode: "Damage", peak: "Master 4", current: "Platinum 4" },
+    { mode: "Support", peak: "", current: "" },
+    { mode: "Competitive 6v6", peak: "", current: "" },
+    { mode: "Stadium", peak: "", current: "" },
+  ], links: [], note: "" },
+
+  { cat: "FPS", sub: "Other", name: "Apex Legends", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "" },
+  { cat: "FPS", sub: "Other", name: "The Finals", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "" },
+  { cat: "FPS", sub: "Other", name: "Marvel Rivals", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "" },
+  { cat: "FPS", sub: "Other", name: "Valorant", modes: [
+    { mode: "Competitive", peak: "Silver 1", current: "Silver 1" },
+  ], links: ["tracker.gg"], note: "" },
+  { cat: "FPS", sub: "Other", name: "Paladins", modes: [
+    { mode: "Competitive", peak: "", current: "" },
+  ], links: [], note: "X" },
+  { cat: "FPS", sub: "Other", name: "Quake Champions", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+  { cat: "FPS", sub: "Other", name: "Splitgate", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+  { cat: "FPS", sub: "Other", name: "Splitgate: Arena Reloaded", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+  { cat: "FPS", sub: "Other", name: "Strinova", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+  { cat: "FPS", sub: "Other", name: "Team Fortress 2", modes: [
+    { mode: "Competitive", peak: "", current: "" },
+  ], links: [], note: "X" },
+  { cat: "FPS", sub: "Other", name: "Rainbow Six Siege", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+  { cat: "FPS", sub: "Other", name: "Dead by Daylight", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+
+  { cat: "BR FPS", sub: "", name: "PUBG: Battlegrounds", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+  { cat: "BR FPS", sub: "", name: "Fortnite", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+
+  { cat: "Rhythm", sub: "osu!", name: "osu!", modes: [
+    { mode: "Standard", peak: "#4,037 Global", current: "#7,358 Global" },
+    { mode: "Mania", peak: "#147,657 Global", current: "#71,949 Global" },
+    { mode: "Taiko", peak: "#22,457 Global", current: "#27,098 Global" },
+    { mode: "Catch The Beat", peak: "#9,683 Global", current: "#10,902 Global" },
+  ], links: ["osu!"], note: "" },
+
+  { cat: "MOBA", sub: "", name: "SMITE", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+  { cat: "MOBA", sub: "", name: "SMITE 2", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+  { cat: "MOBA", sub: "", name: "League of Legends", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+  { cat: "MOBA", sub: "", name: "Dota 2", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+
+  { cat: "Card", sub: "", name: "Minion Masters", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "" },
+  { cat: "Card", sub: "", name: "Clash Royale", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "" },
+  { cat: "Card", sub: "", name: "Teamfight Tactics", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+  { cat: "Card", sub: "", name: "Hearthstone", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+
+  { cat: "Platform", sub: "", name: "Brawlhalla", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+
+  { cat: "Sports", sub: "", name: "Rocket League", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+
+  { cat: "Other", sub: "", name: "Deadlock", modes: [
+    { mode: "Ranked", peak: "", current: "" },
+  ], links: [], note: "X" },
+  { cat: "Other", sub: "", name: "Aim Lab", modes: [
+    { mode: "Benchmark", peak: "", current: "" },
+  ], links: [], note: "" },
+  { cat: "Other", sub: "", name: "Kovaaks Aim Trainer", modes: [
+    { mode: "Benchmark", peak: "", current: "" },
+  ], links: [], note: "" },
+  { cat: "Other", sub: "IRL", name: "Chess", modes: [
+    { mode: "Rated", peak: "", current: "" },
+  ], links: [], note: "X" },
+];
+
+const catColors = {
+  "FPS": "#6366f1",
+  "BR FPS": "#f97316",
+  "Rhythm": "#ec4899",
+  "MOBA": "#10b981",
+  "Card": "#f59e0b",
+  "Platform": "#06b6d4",
+  "Sports": "#22c55e",
+  "Other": "#64748b",
+};
+
+const catIcons = {
+  "FPS": "\ud83c\udfaf",
+  "BR FPS": "\ud83c\udfde\ufe0f",
+  "Rhythm": "\ud83c\udfb5",
+  "MOBA": "\ud83d\udc7d",
+  "Card": "\ud83c\udccf",
+  "Platform": "\ud83c\udfc2",
+  "Sports": "\u26bd",
+  "Other": "\ud83c\udfaf",
+};
+
+function getRankBadgeClass(modes) {
+  const all = modes.map(m => (m.peak + " " + m.current).toLowerCase()).join(" ");
+  if (all.includes("diamond")) return "diamond";
+  if (all.includes("master")) return "master";
+  if (all.includes("platinum") || all.includes("plat")) return "platinum";
+  if (all.includes("gold")) return "gold";
+  if (all.includes("silver")) return "silver";
+  if (all.includes("global")) return "global";
+  if (all.includes("level")) return "level";
+  if (all.includes("19,158")) return "premier";
+  return "";
+}
+
+function hasRankData(g) {
+  return g.modes.some(m => m.peak || m.current);
+}
+
+function render() {
+  const categories = [...new Set(games.map(g => g.cat))];
+  const activeFilter = document.querySelector(".filter-btn.active")?.dataset.cat || "All";
+  const filtered = (activeFilter === "All" ? games : games.filter(g => g.cat === activeFilter)).filter(g => g.note !== "X" && hasRankData(g));
+
+  const visible = (activeFilter === "All" ? games : games.filter(g => g.cat === activeFilter)).filter(g => g.note !== "X" && hasRankData(g));
+  const total = visible.reduce((s, g) => s + g.modes.length, 0);
+  const tracked = visible.reduce((s, g) => s + g.modes.filter(m => m.peak || m.current).length, 0);
+  const peaks = visible.reduce((s, g) => s + g.modes.filter(m => m.peak).length, 0);
+  document.getElementById("totalGames").textContent = total;
+  document.getElementById("trackedGames").textContent = tracked;
+  document.getElementById("peakRanks").textContent = peaks;
+
+  const filtersEl = document.getElementById("filters");
+  filtersEl.innerHTML = "";
+  ["All", ...categories].forEach(cat => {
+    const btn = document.createElement("button");
+    btn.className = "filter-btn" + (cat === activeFilter ? " active" : "");
+    btn.dataset.cat = cat;
+    const count = cat === "All" ? games.length : games.filter(g => g.cat === cat).length;
+    btn.textContent = cat === "All" ? `All (${count})` : `${catIcons[cat] || ""} ${cat} (${count})`;
+    btn.onclick = () => { document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active")); btn.classList.add("active"); render(); };
+    filtersEl.appendChild(btn);
+  });
+
+  const container = document.getElementById("container");
+  container.innerHTML = "";
+
+  const grouped = {};
+  filtered.forEach(g => {
+    const key = g.sub ? `${g.cat} - ${g.sub}` : g.cat;
+    if (!grouped[key]) grouped[key] = { cat: g.cat, sub: g.sub, games: [] };
+    grouped[key].games.push(g);
+  });
+
+  Object.values(grouped).forEach((group, gi) => {
+    const section = document.createElement("div");
+    section.className = "category-section";
+    section.style.animationDelay = `${gi * 0.08}s`;
+
+    const color = catColors[group.cat] || "#64748b";
+    const title = group.sub ? `${group.cat} \u2014 ${group.sub}` : group.cat;
+
+    section.innerHTML = `
+      <div class="category-header">
+        <div class="category-icon" style="background:${color}15;color:${color};border:1px solid ${color}30">${catIcons[group.cat] || "\ud83c\udfaf"}</div>
+        <h2>${title}</h2>
+        <span class="category-count">${group.games.length} game${group.games.length > 1 ? "s" : ""}</span>
+      </div>
+      <div class="games-grid">
+        ${group.games.map((g, i) => {
+          const hasData = hasRankData(g);
+          const badgeClass = getRankBadgeClass(g.modes);
+          const bestRank = g.modes.find(m => m.peak)?.peak || g.modes.find(m => m.current)?.current || "";
+          return `
+            <div class="game-card ${hasData ? "has-rank" : "no-data"}" style="animation: fadeUp 0.5s ease ${i * 0.05}s both">
+              <div class="game-header">
+                <div>
+                  <div class="game-title">${g.name}</div>
+                  ${g.sub ? `<div class="game-subtitle">${g.sub}</div>` : ""}
+                </div>
+                ${badgeClass ? `<span class="rank-badge ${badgeClass}">${bestRank}</span>` : ""}
+              </div>
+              ${g.modes.map(m => `
+                <div class="mode-section">
+                  <div class="mode-header">
+                    <div class="mode-name">${m.mode}</div>
+                    ${m.season ? `<div class="mode-season">S${m.season}</div>` : ""}
+                  </div>
+                  <div class="mode-ranks">
+                    <div class="mode-rank">
+                      <div class="mode-rank-label">Peak</div>
+                      <div class="mode-rank-value ${!m.peak ? "empty" : ""}">${m.peak || "\u2014"}</div>
+                    </div>
+                    <div class="mode-rank">
+                      <div class="mode-rank-label">Current</div>
+                      <div class="mode-rank-value ${!m.current ? "empty" : ""}">${m.current || "\u2014"}</div>
+                    </div>
+                  </div>
+                </div>
+              `).join("")}
+              ${g.links.length ? `
+                <div class="game-links">
+                  ${g.links.map(l => `<span class="game-link">${l}</span>`).join("")}
+                </div>
+              ` : ""}
+              ${g.note && g.note !== "X" ? `<div class="game-note">${g.note}</div>` : ""}
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+    container.appendChild(section);
+  });
+}
+
+render();
+</script>
+
+</body>
+</html>
